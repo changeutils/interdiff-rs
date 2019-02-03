@@ -1,0 +1,12 @@
+[package]
+name = "interdiff-rs"
+version = "0.1.0"
+authors = ["hedgar2017 <hedgar2017@gmail.com>"]
+license = "MIT"
+description = "Rust interdiff implementation"
+edition = "2018"
+
+[dependencies]
+clap = "2.32"
+
+patch-rs = { path = "../patch-rs" }
