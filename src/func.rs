@@ -2,7 +2,7 @@
 //! Helper functions.
 //!
 
-use std::mem;
+use log::*;
 
 use patch_rs::{Context, ContextHeader, PatchLine};
 
@@ -23,34 +23,35 @@ pub fn flip(input: &Context) -> Vec<Context> {
     let mut deletes = Vec::new();
     let mut inserts = Vec::new();
 
-    println!("START");
+    trace!("START");
     for line in input.data.iter() {
         match line {
             PatchLine::Context(_) => {
                 match state {
                     FlipState::StartContext => {
-                        println!("Context StartContext");
-                        if output.ends_with_context_lines() >= 1 {
+                        trace!("Context StartContext");
+                        if output.closing_context_size() >= 1 {
                             output.data.pop();
                             output.header.file1_l += 1;
                             output.header.file2_l += 1;
-                            println!("POP START");
+                            trace!("POP START");
                         }
                         output.data.push(line.clone());
                     },
                     FlipState::Context => {
-                        println!("Context Context");
+                        trace!("Context Context");
                         output.data.push(line.clone());
-                        let lines = output.ends_with_context_lines();
+                        let lines = output.closing_context_size();
                         if lines > 2 {
-                            let mut last = None;
-                            for _ in 1..lines {
-                                last = output.data.pop();
-                                println!("POP END");
+                            let mut data = Vec::new();
+                            data.push(output.data.pop().unwrap());
+                            for _ in 2..lines {
+                                output.data.pop();
+                                trace!("POP END");
                             }
                             output.set_s_values();
 
-                            println!("PUSH OUTPUT");
+                            trace!("PUSH OUTPUT");
                             let output_next = Context {
                                 header: ContextHeader {
                                     file1_l: output.header.file1_l + output.header.file1_s + lines - 2,
@@ -58,17 +59,19 @@ pub fn flip(input: &Context) -> Vec<Context> {
                                     file2_l: output.header.file2_l + output.header.file2_s + lines - 2,
                                     file2_s: Default::default(),
                                 },
-                                data: vec![last.unwrap()],
+                                data,
                             };
 
-                            results.push(output);
+                            if output.has_changes() {
+                                results.push(output);
+                            }
                             output = output_next;
 
                             state = FlipState::Context;
                         }
                     },
                     FlipState::Buffering => {
-                        println!("Context Buffering");
+                        trace!("Context Buffering");
                         output.data.append(&mut deletes);
                         output.data.append(&mut inserts);
                         state = FlipState::Context;
@@ -78,49 +81,50 @@ pub fn flip(input: &Context) -> Vec<Context> {
             },
             PatchLine::Delete(_) => {
                 if let FlipState::StartContext = state {
-                    println!("Delete StartContext");
+                    trace!("Delete StartContext");
                     state = FlipState::Buffering;
                 }
                 if let FlipState::Context = state {
-                    println!("Delete Context");
+                    trace!("Delete Context");
                     state = FlipState::Buffering;
                 }
                 if let FlipState::Buffering = state {
-                    println!("Delete Buffering");
+                    trace!("Delete Buffering");
                     inserts.push(line.flip());
                 }
             },
             PatchLine::Insert(_) => {
-                println!("INSERT");
+                trace!("INSERT");
                 if let FlipState::StartContext = state {
-                    println!("Insert StartContext");
+                    trace!("Insert StartContext");
                     state = FlipState::Buffering;
                 }
                 if let FlipState::Context = state {
-                    println!("Insert Context");
+                    trace!("Insert Context");
                     state = FlipState::Buffering;
                 }
                 if let FlipState::Buffering = state {
-                    println!("Insert Buffering");
+                    trace!("Insert Buffering");
                     deletes.push(line.flip());
                 }
             },
         }
     }
 
-    let lines = output.ends_with_context_lines();
+    let lines = output.closing_context_size();
     if lines > 2 {
-        let mut last = None;
         for _ in 1..lines {
-            last = output.data.pop();
-            println!("POP END");
+            output.data.pop();
+            trace!("POP END");
         }
     }
 
     output.set_s_values();
-    results.push(output);
+    if output.has_changes() {
+        results.push(output);
+    }
 
-    println!("END");
+    trace!("END");
 
     results
 }
