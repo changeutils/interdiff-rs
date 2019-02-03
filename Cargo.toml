@@ -1,6 +1,6 @@
 [package]
 name = "interdiff-rs"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["hedgar2017 <hedgar2017@gmail.com>"]
 license = "MIT"
 description = "Rust interdiff implementation"
